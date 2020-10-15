@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"net"
 	"net/http"
 	"os"
@@ -17,45 +16,24 @@ func checkErr(err error, msg string) {
 	os.Exit(1)
 }
 
+const serverAddr = "localhost:7080"
+const XFF = "1.1.1.1"
+
 func main() {
-	H2CServerUpgrade()
-	//H2CServerPrior()
-}
-
-// This server supports "H2C upgrade" and "H2C prior knowledge" along with
-// standard HTTP/2 and HTTP/1.1 that golang natively supports.
-func H2CServerUpgrade() {
-	h2s := &http2.Server{}
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, %v, http: %v", r.URL.Path, r.TLS == nil)
-	})
-
-	server := &http.Server{
-		Addr:    "0.0.0.0:1010",
-		Handler: h2c.NewHandler(handler, h2s),
-	}
-
-	fmt.Printf("Listening [0.0.0.0:1010]...\n")
-	checkErr(server.ListenAndServe(), "while listening")
-}
-
-// This server only supports "H2C prior knowledge".
-// You can add standard HTTP/2 support by adding a TLS config.
-func H2CServerPrior() {
 	server := http2.Server{}
 
-	l, err := net.Listen("tcp", "0.0.0.0:1010")
+	l, err := net.Listen("tcp", serverAddr)
 	checkErr(err, "while listening")
 
-	fmt.Printf("Listening [0.0.0.0:1010]...\n")
+	fmt.Printf("Listening [%s]...\n", serverAddr)
 	for {
 		conn, err := l.Accept()
 		checkErr(err, "during accept")
 
 		server.ServeConn(conn, &http2.ServeConnOpts{
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Printf("New Connection: %+v\n", r)
+				fmt.Printf("\nNew Request from client: %+v\n\n", r)
+				w.Header().Add("X-Forwarded-For", XFF)
 				fmt.Fprintf(w, "Hello, %v, http: %v", r.URL.Path, r.TLS == nil)
 			}),
 		})

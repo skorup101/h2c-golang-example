@@ -1,4 +1,4 @@
-module github.com/thrawn01/h2c-golang-example
+module github.com/skorup101/h2c-golang-example
 
 go 1.12
 

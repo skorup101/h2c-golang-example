@@ -1,53 +1,20 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"golang.org/x/net/http2"
 	"net"
 	"net/http"
 	"os"
-	"time"
+	"strings"
+	"strconv"
 )
 
-func checkErr(err error, msg string) {
-	if err == nil {
-		return
-	}
-	fmt.Printf("ERROR: %s: %s\n", msg, err)
-	os.Exit(1)
-}
+const URL = "http://localhost:7080"
+const XFF = "1.1.1.1"
 
 func main() {
-	HttpClientExample()
-	//RoundTripExample()
-}
-
-const url = "http://localhost:9030/_groupcache/"
-
-func RoundTripExample() {
-	req, err := http.NewRequest("GET", url, nil)
-	checkErr(err, "during new request")
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	tr := &http2.Transport{
-		AllowHTTP: true,
-		DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			return net.Dial(network, addr)
-		},
-	}
-
-	req.WithContext(ctx)
-	resp, err := tr.RoundTrip(req)
-	checkErr(err, "during roundtrip")
-
-	fmt.Printf("RoundTrip Proto: %d\n", resp.ProtoMajor)
-}
-
-func HttpClientExample() {
 	client := http.Client{
 		Transport: &http2.Transport{
 			AllowHTTP: true,
@@ -57,8 +24,29 @@ func HttpClientExample() {
 		},
 	}
 
-	resp, err := client.Get(url)
-	checkErr(err, "during get")
+	numOfGet := 0
+	httpGet := func(){
+		numOfGet++
+		req, errReq := http.NewRequest("GET", URL, &strings.Reader{})
+		checkErr(errReq, "during newRequest" + strconv.Itoa(numOfGet))
+		req.Header.Add("X-Forwarded-For", XFF)
+		resp, errResp := client.Do(req)
+		
+		// resp, err := client.Get(URL)
+		checkErr(errResp, "during get" + strconv.Itoa(numOfGet))
+		fmt.Println("\nResponse from server nr:", strconv.Itoa(numOfGet), "\n", resp, "\n")
+	};
 
-	fmt.Printf("Client Proto: %d\n", resp.ProtoMajor)
+	// multiple requests on single connection
+	httpGet()
+	httpGet()
+	httpGet()
+}
+
+func checkErr(err error, msg string) {
+	if err == nil {
+		return
+	}
+	fmt.Printf("ERROR: %s: %s\n", msg, err)
+	os.Exit(1)
 }
